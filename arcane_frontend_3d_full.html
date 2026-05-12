@@ -2,134 +2,124 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>A.R.C.A.N.E. 3D Full</title>
 <style>
-/* Design nach deinem Screenshot */
-body { font-family: Arial, sans-serif; background:#1e1e2f; color:#eee; margin:0; padding:0; }
-header { background:#2c2c44; padding:10px; text-align:center; font-size:24px; font-weight:bold; color:#00ffcc; }
-#container { display:flex; height:calc(100vh - 50px); }
-#sidebar { width:250px; background:#2c2c44; padding:10px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
-#chatbox { flex:1; display:flex; flex-direction:column; gap:5px; overflow-y:auto; background:#1e1e2f; padding:10px; border-radius:5px; }
-.message { background:#3a3a5a; padding:8px; border-radius:5px; }
-#inputRow { display:flex; gap:5px; margin-top:5px; }
-input, button { padding:8px; border-radius:5px; border:none; font-size:14px; flex:1; }
-canvas { flex:2; border:1px solid #555; margin:10px; background:#111; }
-button.menuBtn { background:#00ffcc; color:#1e1e2f; font-weight:bold; cursor:pointer; }
-button.menuBtn:hover { background:#00ddaa; }
+  html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; font-family: Arial, sans-serif; background-color: #0b0c1d; color: #00f3ff; }
+  #container { width: 100%; height: 100%; position: relative; }
+  #chat-panel { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.6); display: flex; }
+  #chat-input { flex: 1; padding: 10px; font-size: 16px; background: #111; color: #0ff; border: none; }
+  #chat-send { padding: 10px; background: #00f3ff; color: #000; border: none; cursor: pointer; }
+  #panels { position: absolute; top: 0; left: 0; width: 200px; height: 100%; background: rgba(0,0,0,0.7); display: flex; flex-direction: column; justify-content: start; padding-top: 20px; }
+  .panel-btn { margin: 10px; padding: 10px; background: #111; color: #0ff; cursor: pointer; text-align: center; }
+  canvas { display: block; }
 </style>
 </head>
 <body>
-<header>A.R.C.A.N.E. 3D Full</header>
-<div id="container">
-  <div id="sidebar">
-    <button class="menuBtn" onclick="switchPanel('chat')">Chat</button>
-    <button class="menuBtn" onclick="switchPanel('notes')">Notizen</button>
-    <button class="menuBtn" onclick="switchPanel('rem')">Erinnerungen</button>
-    <button class="menuBtn" onclick="switchPanel('arch')">Archiv</button>
-    <p id="status">Status: Bereit</p>
-  </div>
-  <div style="flex:3; display:flex; flex-direction:column;">
-    <div id="chatbox"></div>
-    <div id="inputRow">
-      <input type="text" id="userInput" placeholder="Nachricht an ARCANE">
-      <button id="sendBtn">Senden</button>
-    </div>
-    <canvas id="scene"></canvas>
-    <audio id="voicePlayer" autoplay></audio>
-  </div>
+<div id="container"></div>
+<div id="panels">
+  <div class="panel-btn" onclick="switchPanel('chat')">KOMM</div>
+  <div class="panel-btn" onclick="switchPanel('notes')">NOTIZ</div>
+  <div class="panel-btn" onclick="switchPanel('rem')">ALARM</div>
+  <div class="panel-btn" onclick="switchPanel('arch')">ARCHIV</div>
+</div>
+<div id="chat-panel">
+  <input id="chat-input" placeholder="Befehl eingeben..." />
+  <button id="chat-send">Senden</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 <script>
-const SERVER_URL="https://arcane-production-61f1.up.railway.app";
+// ---------- 3D Mesh Background ----------
+let scene = new THREE.Scene();
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
+camera.position.z = 600;
 
-const chatbox=document.getElementById("chatbox");
-const input=document.getElementById("userInput");
-const sendBtn=document.getElementById("sendBtn");
-const voicePlayer=document.getElementById("voicePlayer");
-const statusEl=document.getElementById("status");
+let renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.getElementById('container').appendChild(renderer.domElement);
 
-function addMessage(text,sender="A.R.C.A.N.E.") {
-    const div=document.createElement("div");
-    div.className="message";
-    div.textContent=`${sender}: ${text}`;
-    chatbox.appendChild(div);
-    chatbox.scrollTop=chatbox.scrollHeight;
+let points = [];
+let geometry = new THREE.BufferGeometry();
+let vertices = [];
+
+const pointCount = 80;
+for(let i=0;i<pointCount;i++){
+  let x = Math.random()*1200-600;
+  let y = Math.random()*800-400;
+  let z = Math.random()*800-400;
+  vertices.push(x,y,z);
+  points.push(new THREE.Vector3(x,y,z));
 }
 
-async function sendMessage(text){
-    if(!text) return;
-    addMessage(text,"Du");
-    try{
-        const res=await fetch(`${SERVER_URL}/chat`,{
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({messages:[{role:"user",content:text}]})
-        });
-        const data=await res.json();
-        addMessage(data.reply);
-    } catch(err){
-        addMessage("Fehler: Backend nicht erreichbar","System");
+geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices,3));
+
+let material = new THREE.PointsMaterial({color:0x00f3ff, size:3});
+let pointCloud = new THREE.Points(geometry, material);
+scene.add(pointCloud);
+
+let lineMaterial = new THREE.LineBasicMaterial({color:0x00f3ff, opacity:0.3, transparent:true});
+let lines = new THREE.Group();
+scene.add(lines);
+
+function updateLines(){
+  lines.clear();
+  for(let i=0;i<points.length;i++){
+    for(let j=i+1;j<points.length;j++){
+      if(points[i].distanceTo(points[j])<150){
+        let lineGeo = new THREE.BufferGeometry().setFromPoints([points[i],points[j]]);
+        let line = new THREE.Line(lineGeo, lineMaterial);
+        lines.add(line);
+      }
     }
+  }
 }
 
-sendBtn.addEventListener("click",()=>{sendMessage(input.value);input.value="";});
-input.addEventListener("keypress",e=>{if(e.key==="Enter"){sendMessage(input.value);input.value="";}});
-
-function switchPanel(panel){
-    addMessage("Panel gewechselt: "+panel,"System");
+function animate(){
+  requestAnimationFrame(animate);
+  pointCloud.rotation.y += 0.001;
+  pointCloud.rotation.x += 0.0005;
+  updateLines();
+  renderer.render(scene, camera);
 }
-
-// Kamera
-navigator.mediaDevices.getUserMedia({video:true})
-.then(stream=>{
-    const video=document.createElement('video');
-    video.srcObject=stream;
-    video.play();
-    document.body.appendChild(video);
-});
-
-// Wake Word Sprachsteuerung
-if('webkitSpeechRecognition' in window){
-    const recognition=new webkitSpeechRecognition();
-    recognition.continuous=true;
-    recognition.interimResults=false;
-    recognition.lang="de-DE";
-    recognition.onresult=function(event){
-        for(let i=event.resultIndex;i<event.results.length;i++){
-            const transcript=event.results[i][0].transcript.toLowerCase();
-            if(transcript.includes("arcane")){
-                sendMessage("arcane");
-            }
-        }
-    };
-    recognition.start();
-}
-
-// Three.js Canvas Setup
-const canvas=document.getElementById("scene");
-const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(75,canvas.clientWidth/canvas.clientHeight,0.1,1000);
-const renderer=new THREE.WebGLRenderer({canvas});
-renderer.setSize(canvas.clientWidth,canvas.clientHeight);
-camera.position.z=5;
-
-const geometry=new THREE.BoxGeometry();
-const material=new THREE.MeshBasicMaterial({color:0x00ff00});
-const cube=new THREE.Mesh(geometry,material);
-cube.name="Karosserie";
-scene.add(cube);
-
-function animate(){requestAnimationFrame(animate);renderer.render(scene,camera);}
 animate();
 
-// Beispiel: Sprachbefehle für Mesh-Interaktion
-function toggleMesh(name, visible){
-    scene.traverse(obj=>{
-        if(obj.name===name) obj.visible=visible;
-    });
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---------- Chat + Panels ----------
+const BACKEND_URL = "https://arcane-production-61f1.up.railway.app";
+let panel = 'chat';
+
+function switchPanel(p){ panel=p; console.log("Switched to panel:",p); }
+
+// Chat
+document.getElementById('chat-send').onclick = async ()=>{
+  let input = document.getElementById('chat-input').value;
+  if(!input) return;
+  const resp = await fetch(`${BACKEND_URL}/chat`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({messages:[{role:'user',content:input}]})
+  });
+  const data = await resp.json();
+  alert("A.R.C.A.N.E.: " + data.reply);
+  document.getElementById('chat-input').value='';
 }
+
+// ---------- Wake Word ----------
+window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = new SpeechRecognition();
+recognition.continuous = true;
+recognition.lang = 'de-DE';
+recognition.onresult = (event)=>{
+  const transcript = event.results[event.results.length-1][0].transcript.trim();
+  if(transcript.toLowerCase().includes("arcane")) alert("Wake Word erkannt!");
+}
+recognition.start();
+
 </script>
 </body>
 </html>
