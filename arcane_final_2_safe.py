@@ -14,7 +14,7 @@ CLAUDE_KEY = os.getenv("CLAUDE_KEY")
 ELEVEN_KEY = os.getenv("ELEVEN_KEY")
 WEATHER_KEY = os.getenv("WEATHER_KEY")
 TAVILY_KEY = os.getenv("TAVILY_KEY")
-VOICE_ID = "buUrS4YSeOZtlCKnzwkC"
+VOICE_ID = os.getenv("VOICE_ID") or "buUrS4YSeOZtlCKnzwkC"
 DESKTOP = os.path.join(os.path.expanduser("~"), "Desktop")
 
 def load_json(f):
@@ -107,7 +107,7 @@ def greet():
         text += " Heutige Erinnerungen: " + ", ".join([f"{e['zeit']} Uhr: {e['text']}" for e in heutige]) + "."
     return jsonify({"text": text})
 
-# Chat, Speak, Transcribe, Notes, Reminders Routen bleiben genau wie vorher
+# (Hier alle deine Chat, Speak, Transcribe, Notes, Reminders Routen einfügen, wie in deinem Originalcode)
 
 if __name__ == '__main__':
     print("A.R.C.A.N.E. Server läuft auf Railway")
