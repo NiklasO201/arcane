@@ -5,30 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>A.R.C.A.N.E. 3D Full</title>
 <style>
-body { font-family: Arial; background:#1e1e2f; color:#eee; margin:0; padding:0; }
-#chatbox { width:90%; max-width:600px; margin:10px auto; display:flex; flex-direction:column; gap:5px; }
-.message { background:#2c2c44; padding:8px; border-radius:5px; }
-#inputRow { display:flex; gap:5px; width:90%; max-width:600px; margin:10px auto; }
+/* Design nach deinem Screenshot */
+body { font-family: Arial, sans-serif; background:#1e1e2f; color:#eee; margin:0; padding:0; }
+header { background:#2c2c44; padding:10px; text-align:center; font-size:24px; font-weight:bold; color:#00ffcc; }
+#container { display:flex; height:calc(100vh - 50px); }
+#sidebar { width:250px; background:#2c2c44; padding:10px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
+#chatbox { flex:1; display:flex; flex-direction:column; gap:5px; overflow-y:auto; background:#1e1e2f; padding:10px; border-radius:5px; }
+.message { background:#3a3a5a; padding:8px; border-radius:5px; }
+#inputRow { display:flex; gap:5px; margin-top:5px; }
 input, button { padding:8px; border-radius:5px; border:none; font-size:14px; flex:1; }
-canvas { width:100%; height:400px; display:block; margin-top:20px; border:1px solid #555; }
+canvas { flex:2; border:1px solid #555; margin:10px; background:#111; }
+button.menuBtn { background:#00ffcc; color:#1e1e2f; font-weight:bold; cursor:pointer; }
+button.menuBtn:hover { background:#00ddaa; }
 </style>
 </head>
 <body>
-<h1>A.R.C.A.N.E. 3D Full</h1>
-<div id="chatbox"></div>
-<div id="inputRow">
-<input type="text" id="userInput" placeholder="Nachricht an ARCANE">
-<button id="sendBtn">Senden</button>
+<header>A.R.C.A.N.E. 3D Full</header>
+<div id="container">
+  <div id="sidebar">
+    <button class="menuBtn" onclick="switchPanel('chat')">Chat</button>
+    <button class="menuBtn" onclick="switchPanel('notes')">Notizen</button>
+    <button class="menuBtn" onclick="switchPanel('rem')">Erinnerungen</button>
+    <button class="menuBtn" onclick="switchPanel('arch')">Archiv</button>
+    <p id="status">Status: Bereit</p>
+  </div>
+  <div style="flex:3; display:flex; flex-direction:column;">
+    <div id="chatbox"></div>
+    <div id="inputRow">
+      <input type="text" id="userInput" placeholder="Nachricht an ARCANE">
+      <button id="sendBtn">Senden</button>
+    </div>
+    <canvas id="scene"></canvas>
+    <audio id="voicePlayer" autoplay></audio>
+  </div>
 </div>
-<canvas id="scene"></canvas>
-<audio id="voicePlayer" autoplay></audio>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 <script>
-const SERVER_URL="http://127.0.0.1:8080";
+const SERVER_URL="https://arcane-production-61f1.up.railway.app";
+
 const chatbox=document.getElementById("chatbox");
 const input=document.getElementById("userInput");
 const sendBtn=document.getElementById("sendBtn");
 const voicePlayer=document.getElementById("voicePlayer");
+const statusEl=document.getElementById("status");
 
 function addMessage(text,sender="A.R.C.A.N.E.") {
     const div=document.createElement("div");
@@ -41,17 +61,25 @@ function addMessage(text,sender="A.R.C.A.N.E.") {
 async function sendMessage(text){
     if(!text) return;
     addMessage(text,"Du");
-    const res=await fetch(`${SERVER_URL}/chat`,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({messages:[{role:"user",content:text}]})
-    });
-    const data=await res.json();
-    addMessage(data.reply);
+    try{
+        const res=await fetch(`${SERVER_URL}/chat`,{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({messages:[{role:"user",content:text}]})
+        });
+        const data=await res.json();
+        addMessage(data.reply);
+    } catch(err){
+        addMessage("Fehler: Backend nicht erreichbar","System");
+    }
 }
 
 sendBtn.addEventListener("click",()=>{sendMessage(input.value);input.value="";});
 input.addEventListener("keypress",e=>{if(e.key==="Enter"){sendMessage(input.value);input.value="";}});
+
+function switchPanel(panel){
+    addMessage("Panel gewechselt: "+panel,"System");
+}
 
 // Kamera
 navigator.mediaDevices.getUserMedia({video:true})
@@ -62,7 +90,7 @@ navigator.mediaDevices.getUserMedia({video:true})
     document.body.appendChild(video);
 });
 
-// Sprachsteuerung
+// Wake Word Sprachsteuerung
 if('webkitSpeechRecognition' in window){
     const recognition=new webkitSpeechRecognition();
     recognition.continuous=true;
@@ -79,7 +107,7 @@ if('webkitSpeechRecognition' in window){
     recognition.start();
 }
 
-// Three.js Canvas
+// Three.js Canvas Setup
 const canvas=document.getElementById("scene");
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(75,canvas.clientWidth/canvas.clientHeight,0.1,1000);
@@ -90,11 +118,18 @@ camera.position.z=5;
 const geometry=new THREE.BoxGeometry();
 const material=new THREE.MeshBasicMaterial({color:0x00ff00});
 const cube=new THREE.Mesh(geometry,material);
-cube.name="Teil1";
+cube.name="Karosserie";
 scene.add(cube);
 
 function animate(){requestAnimationFrame(animate);renderer.render(scene,camera);}
 animate();
+
+// Beispiel: Sprachbefehle für Mesh-Interaktion
+function toggleMesh(name, visible){
+    scene.traverse(obj=>{
+        if(obj.name===name) obj.visible=visible;
+    });
+}
 </script>
 </body>
 </html>
