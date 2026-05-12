@@ -9,7 +9,6 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
-# Environment Keys
 CLAUDE_KEY = os.getenv("CLAUDE_KEY")
 ELEVEN_KEY = os.getenv("ELEVEN_KEY")
 WEATHER_KEY = os.getenv("WEATHER_KEY")
@@ -17,7 +16,7 @@ TAVILY_KEY = os.getenv("TAVILY_KEY")
 VOICE_ID = os.getenv("VOICE_ID") or "buUrS4YSeOZtlCKnzwkC"
 DESKTOP = os.path.join(os.path.expanduser("~"), "Desktop")
 
-# --- Bestehende Funktionen ---
+# ---------- Alte Funktionen ----------
 def load_json(f):
     p = os.path.join(DESKTOP, f)
     if os.path.exists(p):
@@ -36,25 +35,29 @@ def get_wetter():
         d = r.json()
         return f"{round(d['main']['temp'])}C, {d['weather'][0]['description']}"
     except:
-        return "Wetterdaten nicht verfuegbar"
+        return "Wetterdaten nicht verfügbar"
 
-# --- Chat / Speak / Transcribe / Notes / Reminders / Greet ---
+# ---------- Chat ----------
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
     messages = data.get("messages",[])
-    return jsonify({"reply":"Simulierter Chat-Reply","commands":[]})
+    # Simulierter Chat-Reply
+    return jsonify({"reply":"Hallo Sir, dies ist ein Test-Chat-Reply.","commands":[]})
 
+# ---------- Speak ----------
 @app.route('/speak', methods=['POST'])
 def speak():
     data = request.json
     return Response(b"", mimetype="audio/mpeg")
 
+# ---------- Transcribe ----------
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
     audio = request.files['file']
     return jsonify({"text": "Simuliertes Transcribe-Ergebnis"})
 
+# ---------- Notes / Reminders / Archive ----------
 @app.route('/data/notes', methods=['GET'])
 def get_notes(): return jsonify(load_json('notizen.json'))
 
@@ -64,12 +67,13 @@ def get_reminders(): return jsonify(load_json('erinnerungen.json'))
 @app.route('/data/archive', methods=['GET'])
 def get_archive(): return jsonify(load_json('archiv.json'))
 
+# ---------- Greet ----------
 @app.route('/greet', methods=['GET'])
 def greet():
     n = datetime.now()
-    return jsonify({"text": f"Guten Tag, Sir. Es ist {n.strftime('%d.%m.%Y %H:%M')}."})
+    return jsonify({"text": f"Guten Tag, Sir. Es ist {n.strftime('%A, %d.%m.%Y %H:%M Uhr')}"})
 
-# --- Neue Endpoints ---
+# ---------- Scan ----------
 @app.route('/scan', methods=['POST'])
 def scan_object():
     image = request.files['file']
@@ -80,12 +84,13 @@ def scan_object():
     }
     return jsonify(result)
 
+# ---------- 3D Generation (asynchron) ----------
 @app.route('/generate_3d', methods=['POST'])
 def generate_3d():
     object_name = request.json.get("object","Unbekannt")
     
-    # Blender aufrufen
-    subprocess.run([
+    # Blender im Hintergrund starten
+    subprocess.Popen([
         "blender",
         "--background",
         "--python",
@@ -94,12 +99,35 @@ def generate_3d():
         object_name
     ])
     
-    with open("model.glb", "rb") as f:
-        model_data = f.read()
-    
-    return Response(model_data, mimetype="model/gltf-binary")
+    return jsonify({"status":"3D-Auftrag gestartet","object":object_name})
 
+# ---------- Alte PC-Befehle & Programme ----------
+@app.route('/pc_command', methods=['POST'])
+def pc_command():
+    data = request.json
+    cmd = data.get("command","")
+    # Dummy, simuliert alte PC-Steuerung
+    return jsonify({"status":f"Command '{cmd}' empfangen"})
+
+# ---------- Notizen & Erinnerungen speichern ----------
+@app.route('/save_note', methods=['POST'])
+def save_note():
+    note = request.json.get("text","")
+    notes = load_json("notizen.json")
+    notes.append({"text":note,"datum":datetime.now().strftime("%d.%m.%Y %H:%M")})
+    save_json("notizen.json", notes)
+    return jsonify({"status":"Notiz gespeichert"})
+
+@app.route('/save_reminder', methods=['POST'])
+def save_reminder():
+    rem = request.json
+    reminders = load_json("erinnerungen.json")
+    reminders.append(rem)
+    save_json("erinnerungen.json", reminders)
+    return jsonify({"status":"Erinnerung gespeichert"})
+
+# ---------- Server starten ----------
 if __name__ == '__main__':
-    print("A.R.C.A.N.E. 3D Server läuft auf Railway")
+    print("A.R.C.A.N.E. 3D Server läuft lokal")
     port = int(os.environ.get("PORT",8080))
     app.run(host="0.0.0.0", port=port, debug=False)
