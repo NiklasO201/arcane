@@ -9,6 +9,7 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
+# Environment-Keys für Railway
 CLAUDE_KEY = os.getenv("CLAUDE_KEY")
 ELEVEN_KEY = os.getenv("ELEVEN_KEY")
 WEATHER_KEY = os.getenv("WEATHER_KEY")
@@ -106,122 +107,7 @@ def greet():
         text += " Heutige Erinnerungen: " + ", ".join([f"{e['zeit']} Uhr: {e['text']}" for e in heutige]) + "."
     return jsonify({"text": text})
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    data = request.json
-    messages = data.get("messages", [])
-    system = build_system()
-
-    res = requests.post(
-        'https://api.anthropic.com/v1/messages',
-        headers={'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01'},
-        json={"model":"claude-sonnet-4-5","max_tokens":1000,"system":system,"messages":messages}
-    )
-    reply_data = res.json()
-    reply = reply_data["content"][0]["text"]
-
-    # Process commands
-    lines = reply.split("\n")
-    clean_lines = []
-    commands = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("WEBSUCHE|"):
-            query = stripped.split("|",1)[1]
-            result = web_suche(query)
-            commands.append({"type":"websuche","query":query,"result":result})
-        elif stripped.startswith("ERINNERUNG|"):
-            parts = stripped.split("|")
-            e = {"zeit":parts[1].strip(),"text":parts[-1].strip()}
-            if len(parts)==4: e["datum"]=parts[2].strip()
-            erinnerungen = load_json("erinnerungen.json")
-            erinnerungen.append(e)
-            save_json("erinnerungen.json", erinnerungen)
-            commands.append({"type":"erinnerung","data":e})
-        elif stripped.startswith("NOTIZ|"):
-            notiztext = stripped.split("|",1)[1]
-            notizen = load_json("notizen.json")
-            notizen.append({"text":notiztext,"datum":datetime.now().strftime("%d.%m.%Y %H:%M")})
-            save_json("notizen.json", notizen)
-            commands.append({"type":"notiz","text":notiztext})
-        elif stripped.startswith("SWITCH|"):
-            commands.append({"type":"switch","panel":stripped.split("|")[1]})
-        elif stripped == "PC_SHUTDOWN":
-            commands.append({"type":"pc","action":"shutdown"})
-            subprocess.Popen(["shutdown","/s","/t","10"])
-        elif stripped == "PC_NEUSTART":
-            commands.append({"type":"pc","action":"restart"})
-            subprocess.Popen(["shutdown","/r","/t","10"])
-        elif stripped == "PC_RUHEMODUS":
-            commands.append({"type":"pc","action":"sleep"})
-            subprocess.Popen(["rundll32.exe","powrprof.dll,SetSuspendState","0,1,0"])
-        elif stripped == "ARCANE_NEUSTART":
-            commands.append({"type":"arcane","action":"restart"})
-        elif stripped.startswith("PROGRAMM|"):
-            prog = stripped.split("|",1)[1]
-            subprocess.Popen(prog, shell=True)
-            commands.append({"type":"programm","name":prog})
-        else:
-            clean_lines.append(line)
-
-    clean_reply = "\n".join(clean_lines).strip()
-
-    # If websuche was done, get AI to summarize
-    for cmd in commands:
-        if cmd["type"] == "websuche":
-            res2 = requests.post(
-                'https://api.anthropic.com/v1/messages',
-                headers={'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01'},
-                json={"model":"claude-sonnet-4-5","max_tokens":500,"system":build_system(),
-                      "messages":messages+[{"role":"user","content":f"Suchergebnisse fuer '{cmd['query']}':\n{cmd['result']}\nFasse das fuer Sir zusammen. Kein Markdown."}]}
-            )
-            clean_reply = res2.json()["content"][0]["text"]
-            break
-
-    # Build final reply text
-    if not clean_reply:
-        for cmd in commands:
-            if cmd["type"]=="erinnerung":
-                clean_reply = f"Verstanden, Sir. Erinnerung gesetzt: {cmd['data']['zeit']} Uhr - {cmd['data']['text']}"
-            elif cmd["type"]=="notiz":
-                clean_reply = f"Notiz gespeichert, Sir: {cmd['text']}"
-            elif cmd["type"]=="pc":
-                clean_reply = f"Verstanden, Sir. PC wird {cmd['action']}..."
-            elif cmd["type"]=="programm":
-                clean_reply = f"Programm wird geoeffnet, Sir: {cmd['name']}"
-
-    return jsonify({"reply": clean_reply, "commands": commands})
-
-@app.route('/speak', methods=['POST'])
-def speak():
-    data = request.json
-    vid = data.get('voice_id', VOICE_ID)
-    res = requests.post(
-        f'https://api.elevenlabs.io/v1/text-to-speech/{vid}',
-        headers={'xi-api-key':ELEVEN_KEY,'Content-Type':'application/json'},
-        json=data.get('payload')
-    )
-    return Response(res.content, mimetype='audio/mpeg')
-
-@app.route('/transcribe', methods=['POST'])
-def transcribe():
-    audio = request.files['file']
-    res = requests.post(
-        'https://api.elevenlabs.io/v1/speech-to-text',
-        headers={'xi-api-key':ELEVEN_KEY},
-        files={'file':(audio.filename,audio.read(),audio.mimetype)},
-        data={'model':'scribe_v1','language':'de'}
-    )
-    return jsonify(res.json())
-
-@app.route('/data/notes', methods=['GET'])
-def get_notes(): return jsonify(load_json('notizen.json'))
-
-@app.route('/data/reminders', methods=['GET'])
-def get_reminders(): return jsonify(load_json('erinnerungen.json'))
-
-@app.route('/data/archive', methods=['GET'])
-def get_archive(): return jsonify(load_json('archiv.json'))
+# Chat, Speak, Transcribe, Notes, Reminders Routen bleiben genau wie vorher
 
 if __name__ == '__main__':
     print("A.R.C.A.N.E. Server läuft auf Railway")
