@@ -1,1 +1,1 @@
-web: gunicorn arcane_final_2_safe:app
+web: gunicorn arcane_final_3d_full:app
