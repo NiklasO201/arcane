@@ -9,9 +9,7 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
-# ---------------------------
-# Environment Keys für Railway
-# ---------------------------
+# Environment Keys
 CLAUDE_KEY = os.getenv("CLAUDE_KEY")
 ELEVEN_KEY = os.getenv("ELEVEN_KEY")
 WEATHER_KEY = os.getenv("WEATHER_KEY")
@@ -19,10 +17,7 @@ TAVILY_KEY = os.getenv("TAVILY_KEY")
 VOICE_ID = os.getenv("VOICE_ID") or "buUrS4YSeOZtlCKnzwkC"
 DESKTOP = os.path.join(os.path.expanduser("~"), "Desktop")
 
-# ---------------------------
-# Bestehende Funktionen (Chat, Greet, Speak, Transcribe, Notes, Reminders)
-# ---------------------------
-
+# --- Bestehende Funktionen ---
 def load_json(f):
     p = os.path.join(DESKTOP, f)
     if os.path.exists(p):
@@ -43,6 +38,7 @@ def get_wetter():
     except:
         return "Wetterdaten nicht verfuegbar"
 
+# --- Chat / Speak / Transcribe / Notes / Reminders / Greet ---
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -73,10 +69,7 @@ def greet():
     n = datetime.now()
     return jsonify({"text": f"Guten Tag, Sir. Es ist {n.strftime('%d.%m.%Y %H:%M')}."})
 
-# ---------------------------
-# Neue Endpoints für 3D + Scan
-# ---------------------------
-
+# --- Neue Endpoints ---
 @app.route('/scan', methods=['POST'])
 def scan_object():
     image = request.files['file']
@@ -90,16 +83,21 @@ def scan_object():
 @app.route('/generate_3d', methods=['POST'])
 def generate_3d():
     object_name = request.json.get("object","Unbekannt")
-    # Blender oder externe AI kann hier später eingebunden werden
-    model_data = {
-        "object": object_name,
-        "parts":[
-            {"name":"Teil1","vertices":[]},
-            {"name":"Teil2","vertices":[]},
-            {"name":"Teil3","vertices":[]}
-        ]
-    }
-    return jsonify(model_data)
+    
+    # Blender aufrufen
+    subprocess.run([
+        "blender",
+        "--background",
+        "--python",
+        "blender_generate_model.py",
+        "--",
+        object_name
+    ])
+    
+    with open("model.glb", "rb") as f:
+        model_data = f.read()
+    
+    return Response(model_data, mimetype="model/gltf-binary")
 
 if __name__ == '__main__':
     print("A.R.C.A.N.E. 3D Server läuft auf Railway")
