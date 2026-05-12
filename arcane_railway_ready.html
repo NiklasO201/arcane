@@ -23,12 +23,14 @@ input { flex: 1; }
   <button id="sendBtn">Senden</button>
 </div>
 
+<audio id="voicePlayer" autoplay></audio>
+
 <script>
 const SERVER_URL = "https://arcane-production-61f1.up.railway.app";
-
 const chatbox = document.getElementById("chatbox");
 const input = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
+const voicePlayer = document.getElementById("voicePlayer");
 
 function addMessage(text, sender="A.R.C.A.N.E.") {
     const div = document.createElement("div");
@@ -38,12 +40,11 @@ function addMessage(text, sender="A.R.C.A.N.E.") {
     chatbox.scrollTop = chatbox.scrollHeight;
 }
 
-async function sendMessage() {
-    const text = input.value.trim();
+async function sendMessage(text) {
     if(!text) return;
     addMessage(text, "Du");
-    input.value = "";
-    
+
+    // Chat request
     const res = await fetch(`${SERVER_URL}/chat`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -51,10 +52,41 @@ async function sendMessage() {
     });
     const data = await res.json();
     addMessage(data.reply);
+
+    // Speak request
+    const speakRes = await fetch(`${SERVER_URL}/speak`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            voice_id: "buUrS4YSeOZtlCKnzwkC",
+            payload: {text: data.reply}
+        })
+    });
+    const audioBlob = await speakRes.blob();
+    const audioURL = URL.createObjectURL(audioBlob);
+    voicePlayer.src = audioURL;
 }
 
-sendBtn.addEventListener("click", sendMessage);
-input.addEventListener("keypress", e => { if(e.key === "Enter") sendMessage(); });
+// Button / Enter
+sendBtn.addEventListener("click", () => { sendMessage(input.value); input.value=""; });
+input.addEventListener("keypress", e => { if(e.key==="Enter"){ sendMessage(input.value); input.value=""; }});
+
+// Always-on Speech Recognition
+if('webkitSpeechRecognition' in window){
+    const recognition = new webkitSpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "de-DE";
+    recognition.onresult = function(event){
+        for(let i=event.resultIndex;i<event.results.length;i++){
+            const transcript = event.results[i][0].transcript.toLowerCase();
+            if(transcript.includes("arcane")){ sendMessage("arcane"); }
+        }
+    };
+    recognition.start();
+} else {
+    console.warn("Spracherkennung wird von diesem Browser nicht unterstützt.");
+}
 
 </script>
 </body>
